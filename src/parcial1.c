@@ -31,7 +31,8 @@ int main (){
 		resto = Random2() % 12;
 		
 		if(resto == 0 || resto == 6){
-			imprime_status(iteracao,resto,LOG_THREAD_CREATE);
+			if(QTD_TCB_CRIADOS < QTD_TCB_MAX)
+				imprime_status(iteracao,resto,LOG_THREAD_CREATE);
 		}		
 		if(resto == 1 || resto == 7){
 			imprime_status(iteracao,resto,LOG_THREAD_DISPATCH);		
