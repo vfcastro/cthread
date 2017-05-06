@@ -22,7 +22,7 @@ int thread_finish();
 int thread_block();
 int thread_yield();
 int thread_unblock();
-
+int thread_move(PFILA2 src, PFILA2 dst);
 
 int main (){
 	
@@ -69,7 +69,6 @@ int main (){
 					printf("Erro ao desbloquead thread (chamada thread_unblock)!\n");		
 			imprime_status(iteracao,resto,LOG_THREAD_UNBLOCK);
 		}
-		//sleep(1);
 		iteracao++;
 	}	
 	
@@ -98,6 +97,7 @@ int thread_create(){
 	}	
 	
 	pnode->node = ptcb;
+	ptcb->tid = Random2();
 	
 	if(AppendFila2((PFILA2)&apto, pnode)){
 		printf("thread_create: Erro ao inserir thread na fila de apto!\n");
@@ -105,7 +105,7 @@ int thread_create(){
 		free(pnode);
 		return -1;		
 	}
-	
+		
 	QTD_APTO_ATUAL++;
 	QTD_TCB_CRIADOS++;
 	
@@ -116,36 +116,11 @@ int thread_dispatch(){
 	if(QTD_APTO_ATUAL == 0 || QTD_EXEC_ATUAL != 0)
 		return 0;
 		
-	if(FirstFila2((PFILA2)&apto)){
-		printf("thread_dispatch: Erro ao acessar primeira thread da fila de apto!\n");
-		return -1; 
-	}	
-	
-	TCB_t *ptcb = GetAtIteratorFila2((PFILA2)&apto);
-	if(ptcb == NULL){
-		printf("thread_dispatch: Erro ao acessar TCB da fila de apto!\n");
-		return -1; 
-	}
-	
-	if(DeleteAtIteratorFila2((PFILA2)&apto)){
-		printf("thread_dispatch: Erro ao retirar primeira thread da fila de apto!\n");
-		return -1; 
+	if(thread_move(&apto, &executando)){
+		printf("thread_dispatch: Erro ao mover thread da fila apto para executando!\n");
+		return -1;
 	}
 		
-	PNODE2 pnode = malloc(sizeof(NODE2));
-	if(pnode == NULL){
-		printf("thread_dispatch: Erro ao alocar NODE2 para fila executando!\n");
-		return -1;
-	}			
-	
-	pnode->node = ptcb;
-			
-	if(AppendFila2((PFILA2)&executando, pnode)){
-		printf("thread_dispatch: Erro ao inserir thread na fila de executando!\n");
-		free(pnode);
-		return -1;		
-	}
-	
 	QTD_APTO_ATUAL--;
 	QTD_EXEC_ATUAL++;
 	
@@ -183,34 +158,9 @@ int thread_block(){
 	if(QTD_EXEC_ATUAL == 0)
 		return 0;
 		
-	if(FirstFila2((PFILA2)&executando)){
-		printf("thread_block: Erro ao acessar thread da fila de executando!\n");
-		return -1; 
-	}	
-	
-	TCB_t *ptcb = GetAtIteratorFila2((PFILA2)&executando);
-	if(ptcb == NULL){
-		printf("thread_block: Erro ao acessar TCB da fila de executando!\n");
-		return -1; 
-	}
-	
-	if(DeleteAtIteratorFila2((PFILA2)&executando)){
-		printf("thread_block: Erro ao retirar thread da fila de executando!\n");
-		return -1; 
-	}
-		
-	PNODE2 pnode = malloc(sizeof(NODE2));
-	if(pnode == NULL){
-		printf("thread_block: Erro ao alocar NODE2 para fila bloqueado!\n");
+	if(thread_move(&executando, &bloqueado)){
+		printf("thread_block: Erro ao mover thread da fila executando para bloqueado!\n");
 		return -1;
-	}			
-	
-	pnode->node = ptcb;
-			
-	if(AppendFila2((PFILA2)&bloqueado, pnode)){
-		printf("thread_block: Erro ao inserir thread na fila de bloqueado!\n");
-		free(pnode);
-		return -1;		
 	}
 	
 	QTD_BLOQ_ATUAL++;
@@ -223,36 +173,11 @@ int thread_yield(){
 	if(QTD_EXEC_ATUAL == 0)
 		return 0;
 		
-	if(FirstFila2((PFILA2)&executando)){
-		printf("thread_yield: Erro ao acessar thread da fila de executando!\n");
-		return -1; 
-	}	
-	
-	TCB_t *ptcb = GetAtIteratorFila2((PFILA2)&executando);
-	if(ptcb == NULL){
-		printf("thread_yield: Erro ao acessar TCB da fila de executando!\n");
-		return -1; 
-	}
-	
-	if(DeleteAtIteratorFila2((PFILA2)&executando)){
-		printf("thread_yield: Erro ao retirar thread da fila de executando!\n");
-		return -1; 
+	if(thread_move(&executando, &apto)){
+		printf("thread_yield: Erro ao mover thread da fila executando para apto!\n");
+		return -1;
 	}
 		
-	PNODE2 pnode = malloc(sizeof(NODE2));
-	if(pnode == NULL){
-		printf("thread_yield: Erro ao alocar NODE2 para fila de apto!\n");
-		return -1;
-	}			
-	
-	pnode->node = ptcb;
-			
-	if(AppendFila2((PFILA2)&apto, pnode)){
-		printf("thread_yield: Erro ao inserir thread na fila de apto!\n");
-		free(pnode);
-		return -1;		
-	}
-	
 	QTD_APTO_ATUAL++;
 	QTD_EXEC_ATUAL--;
 	
@@ -263,43 +188,50 @@ int thread_unblock(){
 	if(QTD_BLOQ_ATUAL == 0)
 		return 0;
 		
-	if(FirstFila2((PFILA2)&bloqueado)){
-		printf("thread_unblock: Erro ao acessar thread da fila de bloqueado!\n");
-		return -1; 
-	}	
-	
-	TCB_t *ptcb = GetAtIteratorFila2((PFILA2)&bloqueado);
-	if(ptcb == NULL){
-		printf("thread_unblock: Erro ao acessar TCB da fila de bloqueado!\n");
-		return -1; 
-	}
-	
-	if(DeleteAtIteratorFila2((PFILA2)&bloqueado)){
-		printf("thread_unblock: Erro ao retirar thread da fila de bloqueado!\n");
-		return -1; 
+	if(thread_move(&bloqueado, &apto)){
+		printf("thread_unblock: Erro ao mover thread da fila bloqueado para apto!\n");
+		return -1;
 	}
 		
-	PNODE2 pnode = malloc(sizeof(NODE2));
-	if(pnode == NULL){
-		printf("thread_unblock: Erro ao alocar NODE2 para fila de apto!\n");
-		return -1;
-	}			
-	
-	pnode->node = ptcb;
-			
-	if(AppendFila2((PFILA2)&apto, pnode)){
-		printf("thread_unblock: Erro ao inserir thread na fila de apto!\n");
-		free(pnode);
-		return -1;		
-	}
-	
 	QTD_APTO_ATUAL++;
 	QTD_BLOQ_ATUAL--;
 	
 	return 0;
 }
 
-
+int thread_move(PFILA2 src, PFILA2 dst){
+	if(FirstFila2(src)){
+		printf("thread_move: Erro ao acessar primeira thread da fila origem!\n");
+		return -1; 
+	}	
+	
+	TCB_t *ptcb = GetAtIteratorFila2(src);
+	if(ptcb == NULL){
+		printf("thread_move: Erro ao acessar TCB da fila origem!\n");
+		return -1; 
+	}
+	
+	if(DeleteAtIteratorFila2(src)){
+		printf("thread_move: Erro ao retirar primeira thread da fila origem!\n");
+		return -1; 
+	}
+		
+	PNODE2 pnode = malloc(sizeof(NODE2));
+	if(pnode == NULL){
+		printf("thread_move: Erro ao alocar NODE2 para fila origem!\n");
+		return -1;
+	}			
+	
+	pnode->node = ptcb;
+			
+	if(AppendFila2(dst, pnode)){
+		printf("thread_move: Erro ao inserir thread na fila destino!\n");
+		free(pnode);
+		return -1;		
+	}
+	
+	return 0;
+}
 
 
 
